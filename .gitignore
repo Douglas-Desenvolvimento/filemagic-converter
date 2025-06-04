@@ -1,2 +1,8 @@
 node_modules
 .env
+imagens
+temp
+output
+container_backend/logs
+*.log
+logs/

@@ -1,0 +1,10 @@
+Logs/
+container_backend/
+logs/
+temp/
+output/
+node_modules/
+.env
+*.log
+container_backend/logs/
+conversions.log

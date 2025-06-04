@@ -1,174 +1,199 @@
 import express from "express";
-import { exec, execSync } from "child_process";
+import { exec } from "child_process";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { promisify } from "util";
 
-// Configura caminhos absolutos
+const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Cria diretórios temporários se não existirem
 const tempDir = path.join(__dirname, "../container_backend/temp");
 const outputDir = path.join(__dirname, "../container_backend/output");
+const logDir = path.join(__dirname, "../logs");
+const logFile = path.join(logDir, "server-backend.log");
 
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
 
-function getContainerId() {
+const cleanTempDirectory = () => {
   try {
-    const containerId = execSync('docker ps -qf "name=backend-converter"')
-      .toString()
-      .trim();
-    if (!containerId) throw new Error("Container não encontrado");
-    return containerId;
+    const files = fs.readdirSync(tempDir);
+    if (files.length === 0) return;
+
+    logToFile(`Limpando diretório temp (${files.length} arquivos)`);
+    let deletedCount = 0;
+
+    for (const file of files) {
+      try {
+        const filePath = path.join(tempDir, file);
+        fs.unlinkSync(filePath);
+        deletedCount++;
+      } catch (error) {
+        logToFile(`Erro ao deletar ${file}: ${error.message}`);
+      }
+    }
+
+    logToFile(
+      `Diretório temp limpo (${deletedCount}/${files.length} arquivos removidos)`
+    );
   } catch (error) {
-    console.error("[BACKEND ERRO]", error.message);
-    throw new Error("Container do conversor não está rodando");
+    logToFile(`Erro ao limpar diretório temp: ${error.message}`);
+  }
+};
+
+function logToFile(message) {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] ${message}\n`;
+
+  try {
+    fs.appendFileSync(logFile, logMessage, { encoding: "utf8" });
+  } catch (err) {
+    console.error("Falha ao escrever no arquivo de log:", err);
   }
 }
 
-const upload = multer({
-  dest: tempDir,
-  fileFilter: (req, file, cb) => {
-    const isHEIC = file.originalname.toLowerCase().endsWith(".heic");
-    if (!isHEIC) {
-      return cb(new Error("Apenas arquivos .HEIC são permitidos"));
-    }
-    cb(null, true);
-  },
-  limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB
+const router = express.Router();
+
+const getContainerId = async () => {
+  try {
+    const { stdout } = await execAsync(
+      'docker ps -qf "name=backend-converter"'
+    );
+    const containerId = stdout.trim();
+    if (!containerId) throw new Error("Container não encontrado");
+    return containerId;
+  } catch (error) {
+    console.error("[CONTAINER ERROR]", error.message);
+    throw new Error("Serviço de conversão indisponível");
+  }
+};
+
+const storage = multer.diskStorage({
+  destination: tempDir,
+  filename: (req, file, cb) => {
+    cb(null, file.originalname);
   },
 });
 
-const router = express.Router();
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const isHEIC = /\.heic$/i.test(file.originalname);
+    cb(null, isHEIC);
+  },
+  limits: { fileSize: 50 * 1024 * 1024 },
+});
 
-console.log("[BACKEND] Rota /api/convert inicializada");
+const processConversion = async (containerId, inputPath, outputPath) => {
+  const command = `docker exec ${containerId} python3 /app/heic_to_jpg.py "${inputPath}" "${outputPath}"`;
+  console.log(`Executando: ${command}`);
 
-// Rota para conversão de arquivos
-router.post("/", upload.single("file"), async (req, res) => {
   try {
-    // Validações iniciais
-    if (!req.file) {
+    const { stdout, stderr } = await execAsync(command);
+    if (stderr) throw new Error(stderr);
+    return stdout;
+  } catch (error) {
+    console.error(`Erro na conversão: ${error.message}`);
+    throw error;
+  }
+};
+
+router.post("/", upload.array("files"), async (req, res) => {
+  try {
+    logToFile(`Iniciando conversão para ${req.files.length} arquivos`);
+    if (!req.files || req.files.length === 0) {
+      logToFile("Nenhum arquivo recebido");
       throw new Error("Nenhum arquivo recebido");
     }
 
-    const originalName = req.headers["x-file-name"] || req.file.originalname;
-    const inputExtension = path.extname(originalName).toLowerCase();
+    const containerId = await getContainerId();
+    logToFile(`Container ID obtido: ${containerId}`);
+    logToFile(`Processando ${req.files.length} arquivos`);
 
-    if (inputExtension !== ".heic") {
-      throw new Error(
-        `Formato inválido: ${originalName}. Apenas .HEIC são suportados`
-      );
-    }
+    const results = [];
 
-    // Prepara caminhos
-    const outputFileName = originalName.replace(".heic", ".jpg");
-    const containerInputPath = `/app/temp/${originalName}`;
-    const containerOutputPath = `/app/output/${outputFileName}`;
-    const localTempPath = path.join(outputDir, outputFileName);
+    for (const file of req.files) {
+      // Define filePath corretamente antes de usar
+      const filePath = path.join(tempDir, file.originalname);
+      logToFile(`Iniciando conversão de ${file.originalname}`);
 
-    console.log(`[BACKEND] Processando: ${originalName} -> ${outputFileName}`);
-
-    // Copia arquivo para o container
-    fs.copyFileSync(req.file.path, path.join(tempDir, originalName));
-
-    // Executa conversão no container
-    const containerId = getContainerId();
-    const command = [
-      "docker",
-      "exec",
-      containerId,
-      "python3",
-      "/app/heic_to_jpg.py",
-      `"${containerInputPath}"`,
-      `"${containerOutputPath}"`,
-    ].join(" ");
-
-    console.log(`[BACKEND] Executando: ${command}`);
-
-    exec(command, async (error, stdout, stderr) => {
       try {
-        // Limpeza do arquivo temporário de entrada
-        fs.unlinkSync(req.file.path);
-        fs.unlinkSync(path.join(tempDir, originalName));
-        console.log("[BACKEND] Arquivos temporários removidos");
+        const outputFileName = file.originalname.replace(/\.heic$/i, ".jpg");
+        const containerInput = `/app/temp/${file.originalname}`;
+        const containerOutput = `/app/output/${outputFileName}`;
+        const localOutput = path.join(outputDir, outputFileName);
 
-        if (error) {
-          console.error(`[BACKEND ERRO] ${stderr || error.message}`);
-          return res.status(500).json({
-            error: "Falha na conversão",
-            details: {
-              message: stderr || error.message,
-              command: command,
-              stdout: stdout.toString(),
-            },
+        console.log(`Processando: ${file.originalname} → ${outputFileName}`);
+
+        await processConversion(containerId, containerInput, containerOutput);
+
+        if (fs.existsSync(localOutput)) {
+          const fileBuffer = fs.readFileSync(localOutput);
+          results.push({
+            originalName: file.originalname,
+            fileName: outputFileName,
+            buffer: fileBuffer.toString("base64"),
+            size: fileBuffer.length,
           });
+          fs.unlinkSync(localOutput);
+          logToFile(`Conversão bem-sucedida: ${file.originalname}`);
         }
 
-        console.log(`[BACKEND] Saída do comando: ${stdout}`);
+        // Remove o arquivo temporário após a conversão
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (error) {
+        logToFile(
+          `Erro na conversão de ${file.originalname}: ${error.message}`
+        );
+        console.error(`Erro processando ${file.originalname}:`, error.message);
+        results.push({
+          originalName: file.originalname,
+          error: error.message,
+        });
 
-        // Verificação do arquivo convertido
-        const maxAttempts = 5;
-        let fileReady = false;
-
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-          try {
-            if (fs.existsSync(localTempPath)) {
-              const stats = fs.statSync(localTempPath);
-              if (stats.size > 0) {
-                fileReady = true;
-                console.log(
-                  `[BACKEND] Arquivo convertido encontrado na tentativa ${attempt}`
-                );
-                break;
-              }
-            }
-            await new Promise((resolve) => setTimeout(resolve, 500));
-          } catch (checkError) {
-            console.warn(
-              `[BACKEND] Erro na verificação ${attempt}:`,
-              checkError.message
-            );
+        // Tenta remover o arquivo temporário mesmo em caso de erro
+        try {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
           }
-        }
-
-        if (!fileReady) {
-          throw new Error(
-            `Arquivo não foi gerado corretamente após ${maxAttempts} tentativas`
+        } catch (cleanError) {
+          logToFile(
+            `Erro ao limpar arquivo temporário ${file.originalname}: ${cleanError.message}`
           );
         }
-
-        // Lê o arquivo convertido em memória
-        const fileBuffer = fs.readFileSync(localTempPath);
-
-        // Remove o arquivo temporário de saída
-        fs.unlinkSync(localTempPath);
-
-        // Retorna o arquivo como download
-        res.set("Content-Type", "image/jpeg");
-        res.set(
-          "Content-Disposition",
-          `attachment; filename="${outputFileName}"`
-        );
-        res.send(fileBuffer);
-      } catch (finalError) {
-        console.error("[BACKEND ERRO FINAL]", finalError.message);
-        res.status(500).json({
-          error: "Falha na geração do arquivo",
-          details: finalError.message,
-        });
       }
+    }
+
+    logToFile(
+      `Conversão concluída: ${
+        results.filter((r) => !r.error).length
+      } sucessos, ${results.filter((r) => r.error).length} falhas`
+    );
+
+    res.json({
+      success: true,
+      converted: results.filter((r) => !r.error).length,
+      failed: results.filter((r) => r.error).length,
+      files: results,
     });
-  } catch (outerError) {
-    console.error("[BACKEND ERRO EXTERNO]", outerError.message);
+  } catch (error) {
+    logToFile(`Erro geral na conversão: ${error.message}`);
+    console.error("Erro geral:", error.message);
     res.status(500).json({
-      error: "Erro no processamento inicial",
-      details: outerError.message,
+      error: "Falha no processamento",
+      details: error.message,
     });
   }
 });
+
+setInterval(() => {
+  cleanTempDirectory();
+}, 3600000);
 
 export default router;
