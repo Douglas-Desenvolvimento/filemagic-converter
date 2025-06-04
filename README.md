@@ -54,7 +54,7 @@ docker-compose up -d
 
 # Inicie a aplicação
 npm run dev
-
+```
 # 🌟 Destaques da Versão 1.0
 ✅ Conversão estável de arquivos HEIC para JPG
 ✅ Processamento em lote com acompanhamento de progresso
