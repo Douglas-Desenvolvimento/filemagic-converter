@@ -67,6 +67,8 @@ Adicionar pré-visualização das imagens
 
 Adicionar suporte para outros formatos (PNG, WEBP)
 
+Adicionar funcionalidade de extração de arquivos por links do Google Driver, Google fotos e Microsoft Onedrive
+
 
 ## 📄 Licença
 Distribuído sob licença MIT. Veja LICENSE para mais informações.
