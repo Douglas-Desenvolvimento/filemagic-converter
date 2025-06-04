@@ -55,26 +55,23 @@ docker-compose up -d
 # Inicie a aplicação
 npm run dev
 ```
-# 🌟 Destaques da Versão 1.0
+## 🌟 Destaques da Versão 1.0
 ✅ Conversão estável de arquivos HEIC para JPG
 ✅ Processamento em lote com acompanhamento de progresso
 ✅ Seleção por pasta com navegação recursiva
 ✅ Sistema de logs completo no backend
 ✅ Interface responsiva que se adapta a diferentes telas
 
-##📝 Roadmap
+## 📝 Roadmap
 Adicionar pré-visualização das imagens
-
-Permitir ajuste de qualidade do JPG
 
 Adicionar suporte para outros formatos (PNG, WEBP)
 
-Implementar fila de conversão com priorização
 
 ## 📄 Licença
 Distribuído sob licença MIT. Veja LICENSE para mais informações.
 
 ## ✉️ Contato
-Seu Douglas Silva - douglaspsilva@outlook.com - 21 97044-5500
+Douglas Silva - douglaspsilva@outlook.com - 21 97044-5500
 
 Link do Projeto:https://github.com/Douglas-Desenvolvimento/filemagic-converter
