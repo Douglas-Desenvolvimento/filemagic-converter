@@ -23,6 +23,10 @@ app.use(express.json());
 
 app.use("/api/convert", convertRouter);
 
+app.get("/health", (req, res) => {
+  res.status(200).json({ node: true });
+});
+
 //const PORT = process.env.SERVER_PORT || 6000;
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);

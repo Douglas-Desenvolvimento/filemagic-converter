@@ -5,6 +5,12 @@ import logging
 from pathlib import Path
 import sys
 import time
+from flask import Flask, request, jsonify
+import argparse
+import tempfile
+
+app = Flask(__name__)
+
 
 class ConversionLogger:
     def __init__(self):
@@ -60,6 +66,7 @@ class ConversionLogger:
 
 logger = ConversionLogger()
 
+# ↓↓↓↓↓ MANTIVE SEUS MÉTODOS ORIGINAIS ↓↓↓↓↓
 def convert_single_file(input_path, output_path):
     try:
         input_path = Path(input_path).resolve()
@@ -101,7 +108,7 @@ def convert_directory(input_dir, output_dir):
             jpg_file = output_dir / f"{heic_file.stem}.jpg"
             try:
                 if convert_single_file(heic_file, jpg_file):
-                    converted_files.append(jpg_file)
+                    converted_files.append(str(jpg_file))
             except Exception:
                 continue
                 
@@ -110,23 +117,71 @@ def convert_directory(input_dir, output_dir):
     except Exception as e:
         logger.logger.error(f"🔴 ERRO no diretório: {str(e)}", exc_info=True)
         raise
+# ↑↑↑↑↑ MÉTODOS ORIGINAIS PRESERVADOS ↑↑↑↑↑
+
+@app.route('/health')
+def health():
+    return {"python": True}, 200
+
+@app.route('/convert', methods=['POST'])
+def handle_convert():
+    if 'files' not in request.files:
+        return jsonify({"error": "Nenhum arquivo enviado"}), 400
+    
+    try:
+        # Cria diretório temporário
+        temp_dir = tempfile.mkdtemp()
+        input_dir = Path(temp_dir) / "input"
+        output_dir = Path(temp_dir) / "output"
+        input_dir.mkdir()
+        output_dir.mkdir()
+
+        # Salva arquivos recebidos
+        saved_files = []
+        for file in request.files.getlist('files'):
+            file_path = input_dir / file.filename
+            file.save(file_path)
+            saved_files.append(file_path)
+
+        # Converte usando SUA lógica original
+        converted = []
+        for heic_file in input_dir.glob('*.heic'):
+            jpg_file = output_dir / f"{heic_file.stem}.jpg"
+            if convert_single_file(heic_file, jpg_file):
+                converted.append({
+                    "original": heic_file.name,
+                    "converted": jpg_file.name,
+                    "path": str(jpg_file)
+                })
+
+        return jsonify({
+            "success": True,
+            "converted": converted
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    try:
-        if len(sys.argv) == 3:
-            # Modo arquivo único
-            convert_single_file(sys.argv[1], sys.argv[2])
-        elif len(sys.argv) == 4 and sys.argv[1] == '--dir':
-            # Modo diretório
-            convert_directory(sys.argv[2], sys.argv[3])
-        else:
-            logger.logger.error("Uso:")
-            logger.logger.error("Para arquivo único: python heic_to_jpg.py <entrada.heic> <saida.jpg>")
-            logger.logger.error("Para diretório: python heic_to_jpg.py --dir <pasta_entrada> <pasta_saida>")
-            sys.exit(1)
+    # Modo servidor Flask
+    if len(sys.argv) == 1:
+        app.run(host='0.0.0.0', port=5001)
+    
+    # Modo CLI (para uso local - MANTIVE SEU CÓDIGO ORIGINAL)
+    else:
+        try:
+            if len(sys.argv) == 3:
+                convert_single_file(sys.argv[1], sys.argv[2])
+            elif len(sys.argv) == 4 and sys.argv[1] == '--dir':
+                convert_directory(sys.argv[2], sys.argv[3])
+            else:
+                logger.logger.error("Uso:")
+                logger.logger.error("Para arquivo único: python heic_to_jpg.py <entrada.heic> <saida.jpg>")
+                logger.logger.error("Para diretório: python heic_to_jpg.py --dir <pasta_entrada> <pasta_saida>")
+                sys.exit(1)
+                
+            logger.logger.info("✨ Processo finalizado com sucesso")
             
-        logger.logger.info("✨ Processo finalizado com sucesso")
-        
-    except Exception as e:
-        logger.logger.critical(f"💥 Falha crítica: {str(e)}")
-        sys.exit(1)
+        except Exception as e:
+            logger.logger.critical(f"💥 Falha crítica: {str(e)}")
+            sys.exit(1)

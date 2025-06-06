@@ -100,6 +100,9 @@ export default function FilePicker() {
             current: ''
         });
 
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 30000);
+
         try {
             const formData = new FormData();
             files.forEach(file => formData.append('files', file));
@@ -107,6 +110,7 @@ export default function FilePicker() {
             const response = await fetch('/api/convert', {
                 method: 'POST',
                 body: formData,
+                signal: controller.signal
             });
 
             const result = await response.json();
