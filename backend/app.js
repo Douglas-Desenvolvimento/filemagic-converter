@@ -21,7 +21,6 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 app.use("/api/convert", convertRouter);
-app.use("/api/move-file", moveRouter);
 
 const PORT = process.env.SERVER_PORT || 6000;
 /* app.listen(PORT, () => {
