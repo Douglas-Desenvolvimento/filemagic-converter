@@ -7,7 +7,7 @@ import "dotenv/config";
 const app = express();
 
 const corsOptions = {
-  origin: "http://localhost:5173",
+  origin: ["https://your-frontend.vercel.app", "http://localhost:5173"],
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type", "Authorization", "X-File-Name"],
   exposedHeaders: ["Content-Disposition"],
@@ -22,6 +22,8 @@ app.use("/api/convert", convertRouter);
 app.use("/api/move-file", moveRouter);
 
 const PORT = process.env.SERVER_PORT || 6000;
-app.listen(PORT, () => {
+/* app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
-});
+}); */
+
+export default app;
