@@ -22,7 +22,7 @@ app.use(express.json());
 
 app.use("/api/convert", convertRouter);
 
-const PORT = process.env.SERVER_PORT || 6000;
+//const PORT = process.env.SERVER_PORT || 6000;
 /* app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 }); */
