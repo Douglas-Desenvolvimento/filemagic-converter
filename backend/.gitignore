@@ -8,3 +8,4 @@ node_modules/
 *.log
 container_backend/logs/
 conversions.log
+package-lock.json
