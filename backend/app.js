@@ -1,13 +1,15 @@
 import express from "express";
 import cors from "cors";
 import convertRouter from "./routes/convertRouter.js";
-import moveRouter from "./routes/moveRouter.js";
 import "dotenv/config";
 
 const app = express();
 
 const corsOptions = {
-  origin: "http://localhost:5173",
+  origin: [
+    "https://vercel.com/douglas-pereira-da-silvas-projects/filemagic-converter",
+    "http://localhost:5173",
+  ],
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type", "Authorization", "X-File-Name"],
   exposedHeaders: ["Content-Disposition"],
@@ -22,6 +24,8 @@ app.use("/api/convert", convertRouter);
 app.use("/api/move-file", moveRouter);
 
 const PORT = process.env.SERVER_PORT || 6000;
-app.listen(PORT, () => {
+/* app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
-});
+}); */
+
+export default app;
