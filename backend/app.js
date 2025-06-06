@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import convertRouter from "./routes/convertRouter.js";
 import "dotenv/config";
-const port = process.env.PORT || 4000;
+const PORT = process.env.PORT || 4000;
 
 const app = express();
 
@@ -24,8 +24,8 @@ app.use(express.json());
 app.use("/api/convert", convertRouter);
 
 //const PORT = process.env.SERVER_PORT || 6000;
-/* app.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
-}); */
+});
 
 export default app;
