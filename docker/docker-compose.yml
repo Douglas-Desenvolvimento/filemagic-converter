@@ -3,6 +3,8 @@ services:
     build:
       context: . 
       dockerfile: ./converters/Dockerfile
+    ports:
+      - "5001:5001"
     volumes:
       - ./container_backend/temp:/app/temp:rw
       - ./container_backend/output:/app/output:rw
