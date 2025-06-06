@@ -104,7 +104,7 @@ export default function FilePicker() {
             const formData = new FormData();
             files.forEach(file => formData.append('files', file));
 
-            const response = await fetch('http://localhost:5000/api/convert', {
+            const response = await fetch('/api/convert', {
                 method: 'POST',
                 body: formData,
             });
