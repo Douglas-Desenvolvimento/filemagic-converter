@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import convertRouter from "./routes/convertRouter.js";
 import "dotenv/config";
+const port = process.env.PORT || 4000;
 
 const app = express();
 
