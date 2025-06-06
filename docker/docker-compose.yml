@@ -1,0 +1,18 @@
+services:
+  converter:
+    build:
+      context: . 
+      dockerfile: ./converters/Dockerfile
+    volumes:
+      - ./container_backend/temp:/app/temp:rw
+      - ./container_backend/output:/app/output:rw
+      - ./container_backend/logs:/app/logs:rw
+    environment:
+      - PYTHONUNBUFFERED=1
+    working_dir: /app
+    restart: unless-stopped  
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
