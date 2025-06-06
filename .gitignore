@@ -6,4 +6,3 @@ output
 container_backend/logs
 *.log
 logs/
-package-lock.json
